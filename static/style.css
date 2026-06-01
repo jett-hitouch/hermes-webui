@@ -364,8 +364,21 @@
   :root.dark[data-skin="neon"]{
 
   /* ── Da Qi (大旗财税) ── */
-  :root[data-skin="daqi"]{--accent:#993366;--accent-hover:#7A2952;--accent-bg:rgba(153,51,102,0.08);--accent-bg-strong:rgba(153,51,102,0.15);--accent-text:#7A2952;}
-  :root.dark[data-skin="daqi"]{--accent:#CC6699;--accent-hover:#993366;--accent-bg:rgba(204,102,153,0.08);--accent-bg-strong:rgba(204,102,153,0.15);--accent-text:#CC6699;}
+  /* ── Da Qi (大旗财税 #993366) ── */
+  :root[data-skin="daqi"]{
+    --accent:#993366;--accent-hover:#7A2952;--accent-bg:rgba(153,51,102,0.08);--accent-bg-strong:rgba(153,51,102,0.15);--accent-text:#7A2952;
+    --bg:#FCF7FA;--sidebar:#F5EDF2;--surface:#FFFFFF;--border:#E0D0D8;--border2:rgba(153,51,102,0.12);
+    --input-bg:#F5EDF2;--code-bg:#F0E5EC;--hover-bg:rgba(153,51,102,0.05);
+    --send-btn-bg:#993366;--send-btn-hover:#7A2952;--send-btn-text:#FFFFFF;
+    --scrollbar-track:transparent;--scrollbar-thumb:rgba(153,51,102,0.3);--scrollbar-thumb-hover:rgba(153,51,102,0.5);
+  }
+  :root.dark[data-skin="daqi"]{
+    --accent:#CC6699;--accent-hover:#993366;--accent-bg:rgba(204,102,153,0.08);--accent-bg-strong:rgba(204,102,153,0.15);--accent-text:#CC6699;
+    --bg:#0D0A0C;--sidebar:#16101A;--surface:#1E1624;--border:#2A1A2A;--border2:rgba(204,102,153,0.12);
+    --input-bg:#1A1220;--code-bg:#120D18;--hover-bg:rgba(204,102,153,0.05);
+    --send-btn-bg:#CC6699;--send-btn-hover:#993366;--send-btn-text:#FFFFFF;
+    --scrollbar-track:transparent;--scrollbar-thumb:rgba(204,102,153,0.3);--scrollbar-thumb-hover:rgba(204,102,153,0.5);
+  }
     --bg:#08060d;--sidebar:#06040a;--border:#1c1633;--border2:rgba(179,71,255,0.15);
     --text:#d8d6f0;--muted:#6a6588;--accent:#b347ff;--blue:#a78bfa;--gold:#c084fc;--code-bg:#050308;
     --surface:#0f0d1a;--topbar-bg:rgba(8,6,13,.98);--main-bg:rgba(8,6,13,0.5);
