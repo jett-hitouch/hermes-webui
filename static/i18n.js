@@ -7708,6 +7708,7 @@ const LOCALES = {
   },
 
   zh: {
+    _label: "中文 (Chinese)",
     offline_title: '连接已断开',
     offline_browser_detail: '浏览器报告此设备当前离线。',
     offline_network_detail: '此浏览器当前无法连接到 Hermes。',
