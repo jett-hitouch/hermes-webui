@@ -3217,7 +3217,7 @@ button:hover{background:rgba(124,185,255,.25)}
   <h1>{{BOT_NAME}}</h1>
   <p class="sub">{{LOGIN_SUBTITLE}}</p>
   <form id="login-form" data-invalid-pw="{{LOGIN_INVALID_PW}}" data-conn-failed="{{LOGIN_CONN_FAILED}}">
-    <input type="password" id="pw" placeholder="{{LOGIN_PLACEHOLDER}}" autofocus>
+    <input type="text" id="username" placeholder="Username" autofocus style="margin-bottom:8px"><br><input type="password" id="pw" placeholder="{{LOGIN_PLACEHOLDER}}">
     <button type="submit">{{LOGIN_BTN}}</button>
     <button type="button" id="passkey-login" class="passkey-login" style="display:none">Sign in with passkey</button>
   </form>
@@ -7062,30 +7062,59 @@ def handle_post(handler, parsed) -> bool:
         )
         from api.auth import _check_login_rate, _record_login_attempt, _clear_login_attempts
 
+        from api.fleet_auth import fleet_auth_enabled, verify_fleet_user
+
+        client_ip = handler.client_address[0]
+
+        # Fleet multi-user auth
+        if fleet_auth_enabled():
+            if not _check_login_rate(client_ip):
+                return j(handler, {"error": "Too many attempts. Try again in a minute."}, status=429)
+            username = body.get("username", "").strip().lower()
+            password = body.get("password", "")
+            if not username:
+                return bad(handler, "Username required", 400)
+            user = verify_fleet_user(username, password)
+            if not user:
+                _record_login_attempt(client_ip)
+                return bad(handler, "Invalid username or password", 401)
+            _clear_login_attempts(client_ip)
+            hermes_home = user.get("hermes_home", "")
+            if hermes_home:
+                os.environ["HERMES_HOME"] = hermes_home
+            cookie_val = create_session()
+            resp = json.dumps({"ok": True, "profile": username, "display_name": user.get("display_name", username)}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(resp)))
+            handler.send_header("Cache-Control", "no-store")
+            _security_headers(handler)
+            set_auth_cookie(handler, cookie_val)
+            handler.end_headers()
+            handler.wfile.write(resp)
+            return True
+
+        # Original single-password auth (fallback)
         if not is_auth_enabled():
             return j(handler, {"ok": True, "message": "Auth not enabled"})
         client_ip = handler.client_address[0]
         if not _check_login_rate(client_ip):
-            return j(
-                handler,
-                {"error": "Too many attempts. Try again in a minute."},
-                status=429,
-            )
+            return j(handler, {"error": "Too many attempts. Try again in a minute."}, status=429)
         password = body.get("password", "")
         if not verify_password(password):
             _record_login_attempt(client_ip)
             return bad(handler, "Invalid password", 401)
         _clear_login_attempts(client_ip)
         cookie_val = create_session()
-        body = json.dumps({"ok": True}).encode()
+        body_bytes = json.dumps({"ok": True}).encode()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
-        handler.send_header("Content-Length", str(len(body)))
+        handler.send_header("Content-Length", str(len(body_bytes)))
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
         handler.end_headers()
-        handler.wfile.write(body)
+        handler.wfile.write(body_bytes)
         return True
 
     if parsed.path == "/api/auth/passkey/options":

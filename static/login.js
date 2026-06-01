@@ -1,15 +1,13 @@
-/* Login page — external script, no inline handlers.
- * Loaded by the /login route. Reads data attributes from the form for
- * i18n strings so the server does not need to inject JS literals.
- */
+/* Fleet multi-user login */
 document.addEventListener('DOMContentLoaded', function () {
   var form = document.getElementById('login-form');
-  var input = document.getElementById('pw');
+  var pwInput = document.getElementById('pw');
+  var userInput = document.getElementById('username');
   var passkeyBtn = document.getElementById('passkey-login');
 
-  if (!form || !input) return;
+  if (!form || !pwInput) return;
 
-  var invalidPw = form.getAttribute('data-invalid-pw') || 'Invalid password';
+  var invalidPw = form.getAttribute('data-invalid-pw') || 'Invalid username or password';
   var connFailed = form.getAttribute('data-conn-failed') || 'Connection failed';
 
   function showErr(msg) {
@@ -22,29 +20,27 @@ document.addEventListener('DOMContentLoaded', function () {
     if (err) { err.style.display = 'none'; }
   }
 
-  // Return the ?next= redirect path if present and safe, otherwise './'
-  // Guards against open-redirect: rejects protocol-relative (//evil.com),
-  // absolute URLs, backslash variants, and control characters.
   function _safeNextPath() {
     try {
       var raw = new URL(window.location.href).searchParams.get('next');
       if (!raw) return './';
-      if (raw.charAt(0) !== '/') return './';             // must be path-absolute
-      if (raw.charAt(1) === '/' || raw.charAt(1) === '\\') return './'; // reject // and \\
-      if (/[\x00-\x1f\x7f\s]/.test(raw)) return './';  // reject control chars / whitespace
+      if (raw.charAt(0) !== '/') return './';
+      if (raw.charAt(1) === '/' || raw.charAt(1) === '\\\\') return './';
+      if (/[\\x00-\\x1f\\x7f\\s]/.test(raw)) return './';
       return raw;
     } catch (_) { return './'; }
   }
 
   async function doLogin(e) {
     e.preventDefault();
-    var pw = input.value;
+    var username = userInput ? userInput.value.trim().toLowerCase() : '';
+    var pw = pwInput.value;
     hideErr();
     try {
       var res = await fetch('api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ username: username, password: pw }),
         credentials: 'include',
       });
       var data = {};
@@ -61,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   form.addEventListener('submit', doLogin);
 
+  // Passkey support (unchanged)
   function b64uToBytes(s) {
     s = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
     while (s.length % 4) s += '=';
@@ -74,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var bytes = new Uint8Array(buf);
     var bin = '';
     for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    return btoa(bin).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
   }
 
   async function doPasskeyLogin() {
@@ -93,9 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var cred = await navigator.credentials.get({ publicKey: pk });
       if (!cred) throw new Error('Passkey sign-in cancelled');
       var payload = {
-        id: cred.id,
-        rawId: bytesToB64u(cred.rawId),
-        type: cred.type,
+        id: cred.id, rawId: bytesToB64u(cred.rawId), type: cred.type,
         response: {
           authenticatorData: bytesToB64u(cred.response.authenticatorData),
           clientDataJSON: bytesToB64u(cred.response.clientDataJSON),
@@ -126,52 +121,33 @@ document.addEventListener('DOMContentLoaded', function () {
     passkeyBtn.addEventListener('click', doPasskeyLogin);
   }
 
-  input.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      doLogin(e);
-    }
+  pwInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); doLogin(e); }
   });
 
-  // On page load, probe the server so we can distinguish "can't reach server"
-  // (Tailscale off, wrong network) from "session expired / need to log in".
-  // Uses /health — public for WebUI auth, but deployment access proxies may
-  // require same-origin cookies before the request reaches WebUI.
-  // If unreachable, retries every 3 s and auto-reloads once the server is back.
   (function checkConnectivity() {
     var retryTimer = null;
-
     function setFormDisabled(disabled) {
-      if (input) input.disabled = disabled;
+      if (pwInput) pwInput.disabled = disabled;
+      if (userInput) userInput.disabled = disabled;
       var btn = form.querySelector('button');
       if (btn) btn.disabled = disabled;
     }
-
     function probe() {
       fetch('health', { method: 'GET', credentials: 'same-origin' })
         .then(function (r) {
           if (r.ok) {
-            // Server is reachable — if we were in retry mode, reload so the
-            // page reflects the correct auth state (expired session, etc.).
-            if (retryTimer !== null) {
-              clearTimeout(retryTimer);
-              retryTimer = null;
-              window.location.reload();
-            }
+            if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; window.location.reload(); }
           } else {
             showErr(connFailed + ' (server error ' + r.status + ')');
           }
         })
         .catch(function () {
-          showErr('Cannot reach server — check your VPN / Tailscale connection.');
+          showErr('Cannot reach server');
           setFormDisabled(true);
-          // Keep retrying so the page auto-recovers once the network is back.
-          if (retryTimer === null) {
-            retryTimer = setInterval(probe, 3000);
-          }
+          if (retryTimer === null) { retryTimer = setInterval(probe, 3000); }
         });
     }
-
     probe();
   })();
 });
