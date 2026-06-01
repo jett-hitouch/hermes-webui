@@ -7082,6 +7082,26 @@ def handle_post(handler, parsed) -> bool:
             hermes_home = user.get("hermes_home", "")
             if hermes_home:
                 os.environ["HERMES_HOME"] = hermes_home
+            
+            # Set gateway proxy to user's fleet agent
+            import urllib.request, json as _json
+            try:
+                supabase_url = "https://hitouch.cc/api/supabase"
+                anon_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzc5Nzg1NDE4LCJleHAiOjEzMjkwNDI1NDE4fQ.nMB6i0dUY_4krOrcnaGvwR-hGj0Dfje06qls0a5MnP4"
+                req = urllib.request.Request(
+                    f"{supabase_url}/rest/v1/agent_registry?user_id=eq.{username}&select=instance_ip,port",
+                    headers={"apikey": anon_key, "Authorization": f"Bearer {anon_key}"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    agents = _json.loads(resp.read())
+                if agents:
+                    agent = agents[0]
+                    os.environ["HERMES_WEBUI_CHAT_BACKEND"] = "gateway"
+                    os.environ["HERMES_WEBUI_GATEWAY_BASE_URL"] = f"http://{agent['instance_ip']}:{agent['port']}"
+                    os.environ["API_SERVER_KEY"] = f"fleet-{username}-key"
+            except Exception:
+                pass  # Use local agent if fleet lookup fails
+            
             cookie_val = create_session()
             resp = json.dumps({"ok": True, "profile": username, "display_name": user.get("display_name", username)}).encode()
             handler.send_response(200)
