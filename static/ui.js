@@ -7830,11 +7830,11 @@ function loadPdfInline(container){
     } else if(!_pdfjsLoading){
       _pdfjsLoading=true;
       const s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs';
+      s.src='static/vendor/pdfjs/pdf.min.mjs';
       s.type='module';
       s.textContent=`
         import * as pdfjsLib from '${s.src}';
-        pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc='static/vendor/pdfjs/pdf.worker.min.mjs';
         window._pdfjsLib=pdfjsLib;
         window._pdfjsReady=true;
         window.dispatchEvent(new Event('pdfjs-ready'));
@@ -7890,7 +7890,7 @@ function renderMermaidBlocks(container){
     if(!_mermaidLoading){
       _mermaidLoading=true;
       const script=document.createElement('script');
-      script.src='https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.min.js';
+      script.src='static/vendor/mermaid/mermaid.min.js';
       script.integrity='sha384-R63zfMfSwJF4xCR11wXii+QUsbiBIdiDzDbtxia72oGWfkT7WHJfmD/I/eeHPJyT';
       script.crossOrigin='anonymous';
       script.onload=()=>{
