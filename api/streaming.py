@@ -902,6 +902,14 @@ _API_SAFE_MSG_KEYS = {'role', 'content', 'tool_calls', 'tool_call_id', 'name', '
 
 _NATIVE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
 
+# Per-turn budget (characters of base64) for images inlined into one chat request.
+# The gateway rejects request bodies above 10 MB (api_server.MAX_REQUEST_BYTES), and
+# base64 inflates a file by ~4/3, so a few phone photos are enough to 413 the whole
+# turn before the agent ever sees it. Keep the inline payload well under that cap and
+# let the remaining images ride along as the "[Attached files: ...]" paths — the agent
+# opens those itself with its vision tool, exactly as it does for PDFs and DOCX.
+_NATIVE_IMAGE_INLINE_BUDGET = 8_000_000
+
 _GATEWAY_ROUTING_TOP_LEVEL_KEYS = {
     'used_provider',
     'used_model',
@@ -1263,6 +1271,8 @@ def _build_native_multimodal_message(workspace_ctx: str, msg_text: str, attachme
     except Exception:
         _allowed_roots = (workspace_root,)
     image_count = 0
+    inline_budget_left = _NATIVE_IMAGE_INLINE_BUDGET
+    skipped_for_budget = 0
 
     for att in attachments or []:
         if not isinstance(att, dict):
@@ -1282,6 +1292,13 @@ def _build_native_multimodal_message(workspace_ctx: str, msg_text: str, attachme
             size = path.stat().st_size
             if size <= 0 or size > _NATIVE_IMAGE_MAX_BYTES:
                 continue
+            # Inline only while the turn's base64 budget allows: a request that
+            # overruns the gateway body cap fails as a whole (HTTP 413) and the
+            # user loses every attachment, so prefer a path-only hand-off for the
+            # heavy ones over an all-or-nothing request.
+            if ((size + 2) // 3) * 4 > inline_budget_left:
+                skipped_for_budget += 1
+                continue
             mime = str(att.get('mime') or '').strip() or (mimetypes.guess_type(path.name)[0] or '')
             if not mime.startswith('image/') or not _is_valid_image(path, mime):
                 continue
@@ -1292,8 +1309,16 @@ def _build_native_multimodal_message(workspace_ctx: str, msg_text: str, attachme
             'type': 'image_url',
             'image_url': {'url': f'data:{mime};base64,{data}'},
         })
+        inline_budget_left -= len(data)
         image_count += 1
 
+    if skipped_for_budget:
+        logger.info(
+            'Inlined %d/%d image attachment(s); %d left as file paths to stay under '
+            'the per-turn inline budget (%d base64 chars).',
+            image_count, image_count + skipped_for_budget, skipped_for_budget,
+            _NATIVE_IMAGE_INLINE_BUDGET,
+        )
     return parts if image_count else workspace_ctx + msg_text
 
 

@@ -105,6 +105,22 @@ def _gateway_http_error_event(exc: urllib.error.HTTPError, err_body: str, *, api
                 else "Check that HERMES_WEBUI_GATEWAY_API_KEY matches the Hermes Gateway API_SERVER_KEY."
             ),
         }
+    if exc.code == 413 or "body_too_large" in safe:
+        # The gateway caps a single request at 10 MB and rejects the whole turn,
+        # so the user sees nothing go through and gets no clue what to change.
+        # Say it in the user's terms and give the one action that works.
+        return {
+            "label": "Attachment too large",
+            "type": "attachment_too_large",
+            "message": (
+                "本次消息的内容超过单次请求上限（10MB），整条消息没有发出去，"
+                "助手没有收到任何内容。"
+            ),
+            "hint": (
+                "请把图片压缩后重发，或分批发送；文件（PDF / Word / Excel）不占这个额度，"
+                "可以照常一次多发几个。"
+            ),
+        }
     return {
         "label": "Gateway request failed",
         "type": "gateway_http_error",
